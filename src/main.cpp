@@ -13,9 +13,9 @@
 
 /***********************Пины***********************/
 // Пины двигателя
-#define PIN_STEP 4   // Пин STEP
-#define PIN_DIR 5    // Пин dir
-#define PIN_ENABLE 6 // Пин enable, возможно он называется set
+#define PIN_STEP 4    // Пин STEP
+#define PIN_DIR 5     // Пин dir
+#define PIN_ENABLE 13 // Пин enable, возможно он называется set
 
 // Пины кнопок управления
 #define PIN_BUTTON_A 7 // Пин кнопки движения к концевику A
@@ -26,7 +26,7 @@
 #define PIN_END_B 10 // Пин концевика B
 
 // Потенциометр (Крутилка)
-#define PIN_POTENTIOMETR A0 // Пин регулятора скорости
+#define PIN_REGULATOR A0 // Пин регулятора скорости
 
 /**************************Настройки**************************/
 // Скорость
@@ -35,35 +35,84 @@
 #define SPEED_B 150     // Постоянная скорость в сторону B
 
 // Двигатель
-#define ENABLE_SIGNAL LOW      // Какой сигнал enable разрешает движение: HIGH или LOW
-#define INVERT_DIRECTION false // если мотор крутится не туда, то меняем значение true/false
-#define GS_NO_ACCEL            // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
+#define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
+#define INVERT_DIR false  // если мотор крутится не туда, то меняем значение true/false
+#define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
 
 // Кнопки управления
-#define DEBOUNCE_A_B 50     // Устранить дребезг кнопок A и B (больше = медленнее и точнее)
+#define DEBOUNCE_A_B 50 // Устранить дребезг кнопок A и B (больше = медленнее и точнее)
 /* Супер-мега настройки кнопок управления:
 Ниже произойдёт инициализация кнопок, в скобках там три параметра (1, 2, 3)
 1 - Пин кнопки
-2 - LOW/HIGH - куда замыкается кнопка: LOW = GND, HIGH = 5v
+2 - LOW/HIGH - куда замыкается кнопка: LOW = GND, HIGH = +5v
 3 - NORM_OPEN/NORM_CLOSE
- NORM_OPEN - в обычном состоянии кнопка отжата/разомкнута.
+ NORM_OPEN - в обычном состоянии кнопка отжата/разомкнута. (Обычно так)
  NORM_CLOSE - в обычном состоянии кнопка нажата/замкнута.
 */
 GButton btnA(PIN_BUTTON_A, LOW, NORM_OPEN);
 GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 
 // Концевики
-#define DEBOUNCE_END_A_B 20 // Устранить дребезг концевиков A и B (больше = медленнее и точнее)
-#define SCHEME true 
+#define END_A_CONNECTION LOW // тип подключения концевика А: LOW (к земле) / HIGH (+5v)
+#define END_A_TYPE NORM_OPEN // тип концевика А NORM_OPEN/NORM_CLOSE (см. инструкцию на 7 строк выше)
 
-#include "GyverStepper.h"
-#include "GyverOS.h"
+#define END_B_CONNECTION LOW // тип подключения концевика B: LOW (к земле) / HIGH (+5v)
+#define END_B_TYPE NORM_OPEN // тип концевика B NORM_OPEN/NORM_CLOSE (см. инструкцию на 10 строк выше)
+
+// Потенциометр
+#define DEBOUNCE_REGULATOR 1 // чем больше, тем стабильнее работает крутилка
+
+/****************************КОД*****************************/
+#include "GyverStepper2.h"
+#ifdef DEBUG
+#define DD(x) Serial.println(x)
+#else
+#define DD(x)
+#endif
+GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE); // Шаговый двигатель
 void setup()
 {
-  // put your setup code here, to run once:
+  stepper.reverse(INVERT_DIR);
+  stepper.autoPower(true);
+
+  btnA.setTickMode(AUTO);
+  btnA.setDebounce(DEBOUNCE_A_B);
+
+  btnB.setTickMode(AUTO);
+  btnB.setDebounce(DEBOUNCE_A_B);
+#ifdef DEBUG
+  Serial.println(9600);
+#endif
+  DD("START");
 }
 
+#define END_A_TRUE END_A_CONNECTION ^ END_A_TYPE
+#define END_B_TRUE END_B_CONNECTION ^ END_B_TYPE
+
+class endBtn
+{
+private:
+  /* data */
+public:
+  endBtn(byte pin, byte con_type, byte typ);
+  ~endBtn();
+};
+
+endBtn::endBtn(byte pin, byte con_type, byte typ)
+{
+}
+endBtn::~endBtn()
+{
+}
+
+bool f_manual;
 void loop()
 {
-  // put your main code here, to run repeatedly:
+  if (btnA.isPress())
+  {
+    f_manual = true;
+    while (btnA.state())
+    {
+    }
+  }
 }
