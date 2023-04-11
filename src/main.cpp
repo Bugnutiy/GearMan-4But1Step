@@ -96,19 +96,23 @@ void setup()
 class endBtn
 {
 private:
-  /* data */
+  byte _pin, _truth;
+
 public:
-  endBtn(byte pin, byte con_type, byte truth);
+  endBtn(byte pin, byte pin_mode, byte truth);
   ~endBtn();
 };
 
-endBtn::endBtn(byte pin, byte con_type, byte typ)
+endBtn::endBtn(byte pin, byte pin_mode, byte truth)
 {
+  pinMode(pin, pin_mode);
+  _pin = pin;
+  _truth = truth;
 }
 endBtn::~endBtn()
 {
 }
-
+endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
 bool f_manual;
 void loop()
 {
