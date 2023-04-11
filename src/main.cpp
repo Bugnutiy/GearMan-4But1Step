@@ -88,13 +88,17 @@ void setup()
 
 #define END_A_TRUE END_A_CONNECTION ^ END_A_TYPE
 #define END_B_TRUE END_B_CONNECTION ^ END_B_TYPE
-
+#if END_A_CONNECTION
+#define END_A_PINMODE INPUT
+#else
+#define END_A_PINMODE INPUT_PULLUP
+#endif
 class endBtn
 {
 private:
   /* data */
 public:
-  endBtn(byte pin, byte con_type, byte typ);
+  endBtn(byte pin, byte con_type, byte truth);
   ~endBtn();
 };
 
