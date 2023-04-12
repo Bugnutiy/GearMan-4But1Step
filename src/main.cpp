@@ -30,9 +30,9 @@
 
 /**************************Настройки**************************/
 // Скорость
-#define SPEED_A_MIN 80  // Минимальная скорость в сторону А
-#define SPEED_A_MAX 350 // Максимальная скорость в сторону A
-#define SPEED_B 150     // Постоянная скорость в сторону B
+#define SPEED_A_MIN 80    // Минимальная скорость в сторону А
+#define SPEED_A_MAX 35000 // Максимальная скорость в сторону A
+#define SPEED_B 150       // Постоянная скорость в сторону B
 
 // Двигатель
 #define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
@@ -40,7 +40,7 @@
 #define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
 
 // Кнопки управления
-#define DEBOUNCE_A_B 50 // Устранить дребезг кнопок A и B (больше = медленнее и точнее)
+#define DEBOUNCE_A_B 50 // устранение ложного срабатывания кнопок A и B (больше = медленнее и точнее)
 /* Супер-мега настройки кнопок управления:
 Ниже произойдёт инициализация кнопок, в скобках там три параметра (1, 2, 3)
 1 - Пин кнопки
@@ -59,8 +59,10 @@ GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 #define END_B_CONNECTION LOW // тип подключения концевика B: LOW (к земле) / HIGH (+5v)
 #define END_B_TYPE NORM_OPEN // тип концевика B NORM_OPEN/NORM_CLOSE (см. инструкцию на 10 строк выше)
 
+#define DEBOUNCE_END 20 // устранение ложного срабатывания концевика
+
 // Потенциометр
-#define DEBOUNCE_REGULATOR 1 // чем больше, тем стабильнее работает крутилка
+#define DEBOUNCE_REGULATOR 2 // устранение ложного срабатывания: чем больше, тем стабильнее работает крутилка
 
 /****************************КОД*****************************/
 #include "GyverStepper2.h"
@@ -88,19 +90,29 @@ void setup()
 
 #define END_A_TRUE END_A_CONNECTION ^ END_A_TYPE
 #define END_B_TRUE END_B_CONNECTION ^ END_B_TYPE
+
 #if END_A_CONNECTION
 #define END_A_PINMODE INPUT
 #else
 #define END_A_PINMODE INPUT_PULLUP
 #endif
+
+#if END_B_CONNECTION
+#define END_B_PINMODE INPUT
+#else
+#define END_B_PINMODE INPUT_PULLUP
+#endif
 class endBtn
 {
 private:
   byte _pin, _truth;
+  bool _state;
+  unsigned long _debounce;
 
 public:
   endBtn(byte pin, byte pin_mode, byte truth);
-  ~endBtn();
+  bool state();
+  // ~endBtn();
 };
 
 endBtn::endBtn(byte pin, byte pin_mode, byte truth)
@@ -109,18 +121,73 @@ endBtn::endBtn(byte pin, byte pin_mode, byte truth)
   _pin = pin;
   _truth = truth;
 }
-endBtn::~endBtn()
+bool endBtn::state()
 {
+  if (_state)
+  {
+    _state = (digitalRead(_pin) == _truth);
+    if (_state)
+    {
+      return _state;
+    }
+    _debounce = millis() + DEBOUNCE_END;
+    return _state;
+  }
+
+  if (_debounce)
+  {
+    if (_debounce - millis() <= 0)
+    {
+      _debounce = 0;
+      _state = (digitalRead(_pin) == _truth);
+    }
+    return _state;
+  }
+  _state = (digitalRead(_pin) == _truth);
+  return _state;
 }
 endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
-bool f_manual;
+endBtn endB(PIN_END_B, END_B_PINMODE, END_B_TRUE);
+
+bool f_manual, f_onA, f_onB;
+uint16_t regulator;
+auto speed = SPEED_A_MAX;
+
+bool check_regulator()
+{
+  uint16_t regulator_new = analogRead(PIN_REGULATOR);
+  if (regulator_new - regulator > DEBOUNCE_REGULATOR || regulator_new - regulator < DEBOUNCE_REGULATOR)
+  {
+    regulator = regulator_new;
+    speed = map(regulator, 0, 1023, SPEED_A_MIN, SPEED_A_MAX);
+    return 1;
+  }
+  return 0;
+}
+
+void error()
+{
+}
+
 void loop()
 {
+
   if (btnA.isPress())
   {
+    DD("Кнопка A нажата");
     f_manual = true;
+    check_regulator();
+    stepper.setSpeed(-speed);
     while (btnA.state())
     {
+      if (endA.state())
+      {
+        f_onA = 1;
+      }
+      if (endB.state())
+      {
+        error();
+      }
     }
   }
 }
