@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#define DEBUG
 #include "GyverButton.h"
 /*
 Код ардуино: линейное движение с помощью шагового двигателя nemo 17 через драйвер тмс 2208
@@ -74,23 +75,6 @@ GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 #define DDD(x)
 #endif
 GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE); // Шаговый двигатель
-void setup()
-{
-  stepper.reverse(INVERT_DIR);
-  stepper.autoPower(true);
-
-  btnA.setTickMode(AUTO);
-  btnA.setDebounce(DEBOUNCE_A_B);
-
-  btnB.setTickMode(AUTO);
-  btnB.setDebounce(DEBOUNCE_A_B);
-
-  pinMode(OUTPUT, LED_BUILTIN);
-#ifdef DEBUG
-  Serial.println(9600);
-#endif
-  DD("START");
-}
 
 #define END_A_TRUE END_A_CONNECTION ^ END_A_TYPE
 #define END_B_TRUE END_B_CONNECTION ^ END_B_TYPE
@@ -153,10 +137,16 @@ bool endBtn::state()
 endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
 endBtn endB(PIN_END_B, END_B_PINMODE, END_B_TRUE);
 
-bool f_manual = false, f_onA = false, f_onB = false;
-uint16_t regulator;
+bool f_onA = false, f_onB = false, f_start = false;
+uint16_t regulator = 0;
 auto speed = SPEED_A_MAX;
 
+/**
+ * @brief Определяем скорость в глобальную переменную speed
+ *
+ * @return true - была смена скорости;
+ * @return false - скорость не меняли
+ */
 bool check_regulator()
 {
   uint16_t regulator_new = analogRead(PIN_REGULATOR);
@@ -177,44 +167,71 @@ void error()
     delay(200);
   }
 }
+void setup()
+{
+  stepper.reverse(INVERT_DIR);
+  // stepper.autoPower(true);
 
+  btnA.setTickMode(AUTO);
+  btnA.setDebounce(DEBOUNCE_A_B);
+
+  btnB.setTickMode(AUTO);
+  btnB.setDebounce(DEBOUNCE_A_B);
+
+  f_onA = endA.state();
+  f_onB = endB.state();
+
+  pinMode(OUTPUT, LED_BUILTIN);
+
+#ifdef DEBUG
+  Serial.println(9600);
+#endif
+  DD("START");
+}
 void loop()
 {
-
-  if (btnA.isPress())
+  if (btnA.isPress()) // Движение по кнопке А
   {
-
     DD("Кнопка A нажата");
-    f_manual = true;
-    check_regulator();
-
-    stepper.setSpeed(-speed);
+    // f_manual = true;
+    check_regulator(); // получаем скорость с крутилки
+    stepper.enable();
+    stepper.setSpeed(-speed); // пишем скорость в двигло
     DD("Старт!");
-    while (btnA.state())
+    while (btnA.state()) // Пока кнопка зажата
     {
-      if (endA.state() && !f_onA)
+      if (endA.state()) // если концевик A зажат
       {
+        DD("Конец А");
         f_onA = true;
         stepper.brake();
         stepper.tick();
         stepper.setCurrent(0);
       }
-
-      if (endB.state() && !f_onB)
+      else // тут нам разрешено ехать
       {
-        f_onB = true;
-        stepper.brake();
-        stepper.tick();
-        error();
-      }
-
-      if (f_onB)
-      {
-        if (!endB.state())
+        if (endB.state() && !f_onB) // если сработал не тот концевик
         {
-          f_onB = false;
+          DD("Неправильный конец B");
+          f_onB = true;
+          stepper.brake();
+          stepper.disable();
+          stepper.tick();
+          error(); // Уходим в защиту и мигаем
         }
+
+        if (f_onB && !endB.state())
+        {
+          DD("Отъехали от B");
+          f_onB = false; // если мы отпустили концевик B
+        }
+
+        // едем едем в соседнее село...
         stepper.tick();
+        if (check_regulator())
+        {
+          stepper.setSpeed(-speed);
+        }
       }
       // DD(stepper.getCurrent());
     }
