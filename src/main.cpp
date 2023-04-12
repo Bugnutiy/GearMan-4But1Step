@@ -68,8 +68,10 @@ GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 #include "GyverStepper2.h"
 #ifdef DEBUG
 #define DD(x) Serial.println(x)
+#define DDD(x) Serial.print(x)
 #else
 #define DD(x)
+#define DDD(x)
 #endif
 GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE); // Шаговый двигатель
 void setup()
@@ -82,6 +84,8 @@ void setup()
 
   btnB.setTickMode(AUTO);
   btnB.setDebounce(DEBOUNCE_A_B);
+
+  pinMode(OUTPUT, LED_BUILTIN);
 #ifdef DEBUG
   Serial.println(9600);
 #endif
@@ -149,7 +153,7 @@ bool endBtn::state()
 endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
 endBtn endB(PIN_END_B, END_B_PINMODE, END_B_TRUE);
 
-bool f_manual, f_onA, f_onB;
+bool f_manual = false, f_onA = false, f_onB = false;
 uint16_t regulator;
 auto speed = SPEED_A_MAX;
 
@@ -167,6 +171,11 @@ bool check_regulator()
 
 void error()
 {
+  while (1)
+  {
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    delay(200);
+  }
 }
 
 void loop()
@@ -174,20 +183,40 @@ void loop()
 
   if (btnA.isPress())
   {
+
     DD("Кнопка A нажата");
     f_manual = true;
     check_regulator();
+
     stepper.setSpeed(-speed);
+    DD("Старт!");
     while (btnA.state())
     {
-      if (endA.state())
+      if (endA.state() && !f_onA)
       {
-        f_onA = 1;
+        f_onA = true;
+        stepper.brake();
+        stepper.tick();
+        stepper.setCurrent(0);
       }
-      if (endB.state())
+
+      if (endB.state() && !f_onB)
       {
+        f_onB = true;
+        stepper.brake();
+        stepper.tick();
         error();
       }
+
+      if (f_onB)
+      {
+        if (!endB.state())
+        {
+          f_onB = false;
+        }
+        stepper.tick();
+      }
+      // DD(stepper.getCurrent());
     }
   }
 }
