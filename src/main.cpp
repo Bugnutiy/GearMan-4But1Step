@@ -152,7 +152,10 @@ auto speed = SPEED_A_MAX;
 bool check_regulator()
 {
   uint16_t regulator_new = analogRead(PIN_REGULATOR);
-  if ((regulator_new - regulator) > DEBOUNCE_REGULATOR)
+  int32_t reg = regulator_new - regulator;
+  if (reg < 0)
+    reg = -reg;
+  if (reg > DEBOUNCE_REGULATOR)
   {
     regulator = regulator_new;
     speed = map(regulator, 0, 1023, SPEED_A_MIN, SPEED_A_MAX);
