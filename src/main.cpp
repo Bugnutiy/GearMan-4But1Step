@@ -310,8 +310,7 @@ void loop()
     timework = millis();
   }
 
-  if ((millis() > timework + ADDWORK_TIME) && f_work) 
-  
+  if ((millis() > timework + ADDWORK_TIME) && f_work)
   {
     DD("DISABLE!");
     stepper.disable();
