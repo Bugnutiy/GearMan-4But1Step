@@ -31,14 +31,16 @@
 
 /**************************Настройки**************************/
 // Скорость
-#define SPEED_A_MIN 80    // Минимальная скорость в сторону А
-#define SPEED_A_MAX 35000 // Максимальная скорость в сторону A
-#define SPEED_B 150       // Постоянная скорость в сторону B
+#define SPEED_A_MIN 80       // Минимальная скорость в сторону А
+#define SPEED_A_MAX 35000    // Максимальная скорость в сторону A
+#define SPEED_B 150          // Постоянная скорость в сторону B
+#define TIMER_AUTO_TO_B 2000 // Задержка перед автостартом в сторону А
 
 // Двигатель
 #define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
 #define INVERT_DIR false  // если мотор крутится не туда, то меняем значение true/false
 #define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
+#define ADDWORK_TIME 200  // Время в миллисекундах, в течение которого двигатель не выключеается
 
 // Кнопки управления
 #define DEBOUNCE_A_B 50 // устранение ложного срабатывания кнопок A и B (больше = медленнее и точнее)
@@ -137,8 +139,8 @@ bool endBtn::state()
 endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
 endBtn endB(PIN_END_B, END_B_PINMODE, END_B_TRUE);
 
-bool f_onA = false, f_onB = false, f_start = false;
-uint16_t regulator = 0;
+bool f_onA = false, f_onB = false, f_start = false, f_work = 0;
+int16_t regulator = 0;
 auto speed = SPEED_A_MAX;
 
 /**
@@ -154,6 +156,8 @@ bool check_regulator()
   {
     regulator = regulator_new;
     speed = map(regulator, 0, 1023, SPEED_A_MIN, SPEED_A_MAX);
+    DDD("SPEED: ");
+    DD(speed);
     return 1;
   }
   return 0;
@@ -170,6 +174,8 @@ void error()
 void setup()
 {
   stepper.reverse(INVERT_DIR);
+  stepper.disable();
+  stepper.tick();
   // stepper.autoPower(true);
 
   btnA.setTickMode(AUTO);
@@ -188,6 +194,11 @@ void setup()
 #endif
   DD("START");
 }
+
+unsigned long timework = 0, time_auto_to_b = 0;
+#ifdef DEBUG
+unsigned long timer1 = 0;
+#endif
 void loop()
 {
   if (btnA.state()) // Движение по кнопке А
@@ -196,8 +207,9 @@ void loop()
     // f_manual = true;
     check_regulator(); // получаем скорость с крутилки
     stepper.enable();
+    f_work = 1;
     stepper.setSpeed(-speed); // пишем скорость в двигло
-    DD("Старт!");
+    DD("Старт! К А");
     while (btnA.state()) // Пока кнопка зажата
     {
       if (endA.state()) // если концевик A зажат
@@ -232,9 +244,16 @@ void loop()
         {
           stepper.setSpeed(-speed);
         }
+#ifdef DEBUG
+        if (millis() - timer1 > 500)
+        {
+          timer1 = millis();
+          DD(stepper.getCurrent());
+        }
+#endif
       }
-      // DD(stepper.getCurrent());
     }
+    timework = millis();
   }
 
   if (btnB.state()) // Движение по кнопке B
@@ -243,44 +262,111 @@ void loop()
     // f_manual = true;
     check_regulator(); // получаем скорость с крутилки
     stepper.enable();
+    f_work = 1;
     stepper.setSpeed(speed); // пишем скорость в двигло
-    DD("Старт!");
-    while (btnA.state()) // Пока кнопка зажата
+    DD("Старт! к Б");
+    while (btnB.state()) // Пока кнопка зажата
     {
-      if (endA.state()) // если концевик A зажат
+      if (endB.state()) // если концевик B зажат
       {
-        DD("Конец А");
-        f_onA = true;
+        DD("Конец B");
+        f_onB = true;
         stepper.brake();
         stepper.tick();
-        stepper.setCurrent(0);
       }
       else // тут нам разрешено ехать
       {
-        if (endB.state() && !f_onB) // если сработал не тот концевик
+        if (endA.state() && !f_onA) // если сработал не тот концевик
         {
-          DD("Неправильный конец B");
-          f_onB = true;
+          DD("Неправильный конец A");
+          f_onA = true;
           stepper.brake();
           stepper.disable();
           stepper.tick();
           error(); // Уходим в защиту и мигаем
         }
 
-        if (f_onB && !endB.state())
+        if (f_onA && !endA.state())
         {
-          DD("Отъехали от B");
-          f_onB = false; // если мы отпустили концевик B
+          DD("Отъехали от A");
+          f_onA = false; // если мы отпустили концевик A
         }
 
         // едем едем в соседнее село...
         stepper.tick();
         if (check_regulator())
         {
-          stepper.setSpeed(-speed);
+          stepper.setSpeed(speed);
         }
+#ifdef DEBUG
+        if (millis() - timer1 > 500)
+        {
+          timer1 = millis();
+          DD(stepper.getCurrent());
+        }
+#endif
       }
-      // DD(stepper.getCurrent());
     }
+    timework = millis();
+  }
+
+  if ((millis() > timework + ADDWORK_TIME) && f_work)
+  {
+    DD("DISABLE!");
+    stepper.disable();
+    f_work = 0;
+  }
+
+  // TIMER_AUTO_TO_B
+  if (endA.state()) // Движение от А к B
+  {
+    f_onA = 1;
+    DD("A -> B START");
+    stepper.enable();
+    stepper.tick();
+    delay(TIMER_AUTO_TO_B);
+    f_work = 1;
+    stepper.setSpeed(SPEED_B); // пишем скорость в двигло
+    DD("Старт! A -> к Б");
+    while (!endB.state()) // Пока не встретим B
+    {
+      // тут нам разрешено ехать
+      if (endA.state() && !f_onA) // если сработал не тот концевик
+      {
+        DD("Неправильный конец A");
+        f_onA = true;
+        stepper.brake();
+        stepper.disable();
+        stepper.tick();
+        error(); // Уходим в защиту и мигаем
+      }
+
+      if (f_onA && !endA.state())
+      {
+        DD("Отъехали от A");
+        f_onA = false; // если мы отпустили концевик A
+      }
+
+      if (btnA.state() || btnB.state())
+      {
+        break;
+      }
+      // едем едем в соседнее село...
+      stepper.tick();
+
+#ifdef DEBUG
+      if (millis() - timer1 > 500)
+      {
+        timer1 = millis();
+        DD(stepper.getCurrent());
+      }
+#endif
+    }
+    if (endB.state())
+    {
+      stepper.brake();
+      stepper.tick();
+    }
+    timework = millis();
   }
 }
