@@ -97,7 +97,7 @@ class endBtn
 private:
   byte _pin, _truth;
   bool _state;
-  unsigned long _debounce;
+  unsigned long _debounce = 0;
 
 public:
   endBtn(byte pin, byte pin_mode, byte truth);
@@ -118,15 +118,15 @@ bool endBtn::state()
     _state = (digitalRead(_pin) == _truth);
     if (_state)
     {
-      return _state;
+      return _state; // 1
     }
     _debounce = millis() + DEBOUNCE_END;
-    return _state;
+    return _state; // 0
   }
 
   if (_debounce)
   {
-    if (_debounce - millis() <= 0)
+    if (millis() >= _debounce)
     {
       _debounce = 0;
       _state = (digitalRead(_pin) == _truth);
@@ -140,7 +140,7 @@ endBtn endA(PIN_END_A, END_A_PINMODE, END_A_TRUE);
 endBtn endB(PIN_END_B, END_B_PINMODE, END_B_TRUE);
 
 bool f_onA = false, f_onB = false, f_start = false, f_work = 0;
-int16_t regulator = 0;
+uint16_t regulator = 0;
 auto speed = SPEED_A_MAX;
 
 /**
@@ -152,7 +152,7 @@ auto speed = SPEED_A_MAX;
 bool check_regulator()
 {
   uint16_t regulator_new = analogRead(PIN_REGULATOR);
-  if (regulator_new - regulator > DEBOUNCE_REGULATOR || regulator_new - regulator < DEBOUNCE_REGULATOR)
+  if ((regulator_new - regulator) > DEBOUNCE_REGULATOR)
   {
     regulator = regulator_new;
     speed = map(regulator, 0, 1023, SPEED_A_MIN, SPEED_A_MAX);
@@ -165,11 +165,11 @@ bool check_regulator()
 
 void error()
 {
-  while (1)
-  {
-    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    delay(200);
-  }
+  // while (1)
+  // {
+  // digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+  // delay(200);
+  // }
 }
 void setup()
 {
@@ -186,11 +186,11 @@ void setup()
 
   f_onA = endA.state();
   f_onB = endB.state();
-
+  speed = SPEED_A_MIN;
   pinMode(OUTPUT, LED_BUILTIN);
 
 #ifdef DEBUG
-  Serial.println(9600);
+  Serial.begin(9600);
 #endif
   DD("START");
 }
@@ -203,6 +203,8 @@ void loop()
 {
   if (btnA.state()) // Движение по кнопке А
   {
+    f_onA = endA.state();
+    f_onB = endB.state();
     DD("Кнопка A нажата");
     // f_manual = true;
     check_regulator(); // получаем скорость с крутилки
@@ -253,18 +255,20 @@ void loop()
 #endif
       }
     }
-    timework = millis();
+    timework = millis() + ADDWORK_TIME;
   }
 
   if (btnB.state()) // Движение по кнопке B
   {
+    f_onA = endA.state();
+    f_onB = endB.state();
     DD("Кнопка B нажата");
     // f_manual = true;
-    check_regulator(); // получаем скорость с крутилки
+    // check_regulator(); // получаем скорость с крутилки
     stepper.enable();
     f_work = 1;
-    stepper.setSpeed(speed); // пишем скорость в двигло
-    DD("Старт! к Б");
+    stepper.setSpeed(SPEED_B); // пишем скорость в двигло
+    DD("Старт! к B");
     while (btnB.state()) // Пока кнопка зажата
     {
       if (endB.state()) // если концевик B зажат
@@ -294,10 +298,10 @@ void loop()
 
         // едем едем в соседнее село...
         stepper.tick();
-        if (check_regulator())
-        {
-          stepper.setSpeed(speed);
-        }
+        // if (check_regulator())
+        // {
+        //   stepper.setSpeed(speed);
+        // }
 #ifdef DEBUG
         if (millis() - timer1 > 500)
         {
@@ -307,10 +311,10 @@ void loop()
 #endif
       }
     }
-    timework = millis();
+    timework = millis() + ADDWORK_TIME;
   }
 
-  if ((millis() > timework + ADDWORK_TIME) && f_work)
+  if ((millis() > timework) && f_work)
   {
     DD("DISABLE!");
     stepper.disable();
@@ -320,7 +324,8 @@ void loop()
   // TIMER_AUTO_TO_B
   if (endA.state()) // Движение от А к B
   {
-    f_onA = 1;
+    f_onA = endA.state();
+    f_onB = endB.state();
     DD("A -> B START");
     stepper.enable();
     stepper.tick();
@@ -364,9 +369,13 @@ void loop()
     }
     if (endB.state())
     {
+      DD("END_B AUTO");
+      f_onB = 1;
       stepper.brake();
       stepper.tick();
     }
     timework = millis();
   }
+  f_onA = endA.state();
+  f_onB = endB.state();
 }
