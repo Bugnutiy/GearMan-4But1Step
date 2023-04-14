@@ -190,13 +190,60 @@ void setup()
 }
 void loop()
 {
-  if (btnA.isPress()) // Движение по кнопке А
+  if (btnA.state()) // Движение по кнопке А
   {
     DD("Кнопка A нажата");
     // f_manual = true;
     check_regulator(); // получаем скорость с крутилки
     stepper.enable();
     stepper.setSpeed(-speed); // пишем скорость в двигло
+    DD("Старт!");
+    while (btnA.state()) // Пока кнопка зажата
+    {
+      if (endA.state()) // если концевик A зажат
+      {
+        DD("Конец А");
+        f_onA = true;
+        stepper.brake();
+        stepper.tick();
+        stepper.setCurrent(0);
+      }
+      else // тут нам разрешено ехать
+      {
+        if (endB.state() && !f_onB) // если сработал не тот концевик
+        {
+          DD("Неправильный конец B");
+          f_onB = true;
+          stepper.brake();
+          stepper.disable();
+          stepper.tick();
+          error(); // Уходим в защиту и мигаем
+        }
+
+        if (f_onB && !endB.state())
+        {
+          DD("Отъехали от B");
+          f_onB = false; // если мы отпустили концевик B
+        }
+
+        // едем едем в соседнее село...
+        stepper.tick();
+        if (check_regulator())
+        {
+          stepper.setSpeed(-speed);
+        }
+      }
+      // DD(stepper.getCurrent());
+    }
+  }
+
+  if (btnB.state()) // Движение по кнопке B
+  {
+    DD("Кнопка B нажата");
+    // f_manual = true;
+    check_regulator(); // получаем скорость с крутилки
+    stepper.enable();
+    stepper.setSpeed(speed); // пишем скорость в двигло
     DD("Старт!");
     while (btnA.state()) // Пока кнопка зажата
     {
