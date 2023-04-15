@@ -19,8 +19,8 @@
 #define PIN_ENABLE 6 // Пин enable, возможно он называется set
 
 // Пины кнопок управления
-#define PIN_BUTTON_A 7 // Пин кнопки движения к концевику A
-#define PIN_BUTTON_B 8 // Пин кнопки движения к концевику B
+#define PIN_BUTTON_A 8 // Пин кнопки движения к концевику A
+#define PIN_BUTTON_B 7 // Пин кнопки движения к концевику B
 
 // Пины концевиков
 #define PIN_END_A 9  // Пин концевика A
@@ -38,7 +38,7 @@
 
 // Двигатель
 #define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
-#define INVERT_DIR false  // если мотор крутится не туда, то меняем значение true/false
+#define INVERT_DIR true  // если мотор крутится не туда, то меняем значение true/false
 #define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
 #define ADDWORK_TIME 200  // Время в миллисекундах, в течение которого двигатель не выключеается
 
