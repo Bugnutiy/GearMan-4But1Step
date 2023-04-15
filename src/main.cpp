@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "GyverButton.h"
-// #define DEBUG //Расскоментировать для монитора порта
+#define DEBUG // Расскоментировать для монитора порта
 /*
 Код ардуино: линейное движение с помощью шагового двигателя nemo 17 через драйвер тмс 2208
 в сторону "а" и в сторону "б" приводится с помощью  нажатия кнопок "1" и "2" соответственно.
@@ -38,7 +38,7 @@
 
 // Двигатель
 #define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
-#define INVERT_DIR true  // если мотор крутится не туда, то меняем значение true/false
+#define INVERT_DIR true   // если мотор крутится не туда, то меняем значение true/false
 #define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
 #define ADDWORK_TIME 200  // Время в миллисекундах, в течение которого двигатель не выключеается
 
@@ -223,12 +223,12 @@ void loop()
     stepper.enable();
     f_work = 1;
     stepper.setSpeed(-speed); // пишем скорость в двигло
-    DD("Старт! К А");
+    DD("Старт! B -> А");
     while (btnA.state()) // Пока кнопка зажата
     {
       if (endA.state()) // если концевик A зажат
       {
-        DD("Конец А");
+        DD("Конец А сработал");
         f_onA = true;
         stepper.brake();
         stepper.tick();
@@ -280,12 +280,12 @@ void loop()
     stepper.enable();
     f_work = 1;
     stepper.setSpeed(SPEED_B); // пишем скорость в двигло
-    DD("Старт! к B");
+    DD("Старт! A -> B");
     while (btnB.state()) // Пока кнопка зажата
     {
       if (endB.state()) // если концевик B зажат
       {
-        DD("Конец B");
+        DD("Конец B сработал");
         f_onB = true;
         stepper.brake();
         stepper.tick();
@@ -328,7 +328,7 @@ void loop()
 
   if ((millis() > timework) && f_work)
   {
-    DD("DISABLE!");
+    DD("Двишатель отключен!");
     stepper.disable();
     f_work = 0;
   }
@@ -338,13 +338,13 @@ void loop()
   {
     f_onA = endA.state();
     f_onB = endB.state();
-    DD("A -> B START");
+    DD("A -> B Автостарт");
+    stepper.setSpeed(SPEED_B); // пишем скорость в двигло
     stepper.enable();
     stepper.tick();
     delay(TIMER_AUTO_TO_B);
     f_work = 1;
-    stepper.setSpeed(SPEED_B); // пишем скорость в двигло
-    DD("Старт! A -> к Б");
+    DD("Старт! A -> Б");
     while (!endB.state()) // Пока не встретим B
     {
       // тут нам разрешено ехать
