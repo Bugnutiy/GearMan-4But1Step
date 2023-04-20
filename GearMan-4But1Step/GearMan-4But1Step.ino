@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "GyverButton.h"
-#define DEBUG //Расскоментировать для монитора порта
+// #define DEBUG // Расскоментировать для монитора порта
 /*
 Код ардуино: линейное движение с помощью шагового двигателя nemo 17 через драйвер тмс 2208
 в сторону "а" и в сторону "б" приводится с помощью  нажатия кнопок "1" и "2" соответственно.
@@ -14,36 +14,40 @@
 
 /***********************Пины***********************/
 // Пины двигателя
-#define PIN_STEP 4    // Пин STEP
-#define PIN_DIR 5     // Пин dir
-#define PIN_ENABLE 6  // Пин enable, возможно он называется set
+#define PIN_STEP 4   // Пин STEP
+#define PIN_DIR 5    // Пин dir
+#define PIN_ENABLE 6 // Пин enable, возможно он называется set
 
 // Пины кнопок управления
-#define PIN_BUTTON_A 7  // Пин кнопки движения к концевику A
-#define PIN_BUTTON_B 8  // Пин кнопки движения к концевику B
+#define PIN_BUTTON_A 10 // Пин кнопки движения к концевику A
+#define PIN_BUTTON_B 7  // Пин кнопки движения к концевику B
 
 // Пины концевиков
-#define PIN_END_A 9   // Пин концевика A
-#define PIN_END_B 10  // Пин концевика B
+#define PIN_END_A 11 // Пин концевика A
+#define PIN_END_B 9  // Пин концевика B
 
 // Потенциометр (Крутилка)
-#define PIN_REGULATOR A0  // Пин регулятора скорости
+#define PIN_REGULATOR A0 // Пин регулятора скорости
 
 /**************************Настройки**************************/
 // Скорость
-#define SPEED_A_MIN 80        // Минимальная скорость в сторону А (Шагов в секунду)
-#define SPEED_A_MAX 2000      // Максимальная скорость в сторону A
-#define SPEED_B 150           // Постоянная скорость в сторону B
-#define TIMER_AUTO_TO_B 2000  // Задержка перед автостартом в сторону А
+#define SPEED_A_MIN 100    // Минимальная скорость в сторону А (Шагов в секунду)
+#define SPEED_A_MAX 1500   // Максимальная скорость в сторону A
+#define SPEED_B 2000       // Постоянная скорость в сторону B
+#define TIMER_AUTO_TO_B 10 // Задержка перед автостартом в сторону А
+
+#define RETRACT_SPEED 2000 // Скорость отката
+#define RETRACT 4000       // откат в шагах/сек
+#define RETRACT_DIV 1      // делитель отката. Если откат 2000, то при делителе 2 мы должны сделать минимум 1000 шагов, чтобы откат сработал
 
 // Двигатель
-#define ENABLE_SIGNAL LOW  // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
-#define INVERT_DIR false   // если мотор крутится не туда, то меняем значение true/false
-#define GS_NO_ACCEL        // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
-#define ADDWORK_TIME 200   // Время в миллисекундах, в течение которого двигатель не выключеается
+#define ENABLE_SIGNAL LOW // Какой сигнал enable разрешает движение: HIGH (+5v) или LOW (GND)
+#define INVERT_DIR false  // если мотор крутится не туда, то меняем значение true/false
+#define GS_NO_ACCEL       // Эта строчка убирает плавный старт и плавный тормоз моторов, делая их резкими
+#define ADDWORK_TIME 200  // Время в миллисекундах, в течение которого двигатель не выключеается
 
 // Кнопки управления
-#define DEBOUNCE_A_B 50  // устранение ложного срабатывания кнопок A и B (больше = медленнее и точнее)
+#define DEBOUNCE_A_B 150 // устранение ложного срабатывания кнопок A и B (больше = медленнее и точнее)
 /* Супер-мега настройки кнопок управления:
 Ниже произойдёт инициализация кнопок, в скобках там три параметра (1, 2, 3)
 1 - Пин кнопки
@@ -56,19 +60,19 @@ GButton btnA(PIN_BUTTON_A, LOW, NORM_OPEN);
 GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 
 // Концевики
-#define END_A_CONNECTION LOW  // тип подключения концевика А: LOW (к земле) / HIGH (+5v)
-#define END_A_TYPE NORM_OPEN  // тип концевика А NORM_OPEN/NORM_CLOSE (см. инструкцию на 7 строк выше)
+#define END_A_CONNECTION LOW // тип подключения концевика А: LOW (к земле) / HIGH (+5v)
+#define END_A_TYPE NORM_OPEN // тип концевика А NORM_OPEN/NORM_CLOSE (см. инструкцию на 7 строк выше)
 
-#define END_B_CONNECTION LOW  // тип подключения концевика B: LOW (к земле) / HIGH (+5v)
-#define END_B_TYPE NORM_OPEN  // тип концевика B NORM_OPEN/NORM_CLOSE (см. инструкцию на 10 строк выше)
+#define END_B_CONNECTION LOW // тип подключения концевика B: LOW (к земле) / HIGH (+5v)
+#define END_B_TYPE NORM_OPEN // тип концевика B NORM_OPEN/NORM_CLOSE (см. инструкцию на 10 строк выше)
 
-#define DEBOUNCE_END 20  // устранение ложного срабатывания концевика
+#define DEBOUNCE_END 500 // устранение ложного срабатывания концевика
 
 // Потенциометр
-#define DEBOUNCE_REGULATOR 2    // устранение ложного срабатывания: чем больше, тем стабильнее работает крутилка
-#define REGULATOR_INVERT false  // true/false сменить направление регулятора
+#define DEBOUNCE_REGULATOR 2   // устранение ложного срабатывания: чем больше, тем стабильнее работает крутилка
+#define REGULATOR_INVERT false // true/false сменить направление регулятора
 
-#define PROTECT true  // защита от неверного подключения (true/false)
+#define PROTECT 0 // защита от неверного подключения (true/false)
 
 /****************************КОД*****************************/
 #include "GyverStepper2.h"
@@ -79,7 +83,7 @@ GButton btnB(PIN_BUTTON_B, LOW, NORM_OPEN);
 #define DD(x)
 #define DDD(x)
 #endif
-GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE);  // Шаговый двигатель
+GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE); // Шаговый двигатель
 
 #define END_A_TRUE END_A_CONNECTION ^ END_A_TYPE
 #define END_B_TRUE END_B_CONNECTION ^ END_B_TYPE
@@ -95,7 +99,8 @@ GStepper2<STEPPER2WIRE> stepper(0, PIN_STEP, PIN_DIR, PIN_ENABLE);  // Шаго�
 #else
 #define END_B_PINMODE INPUT_PULLUP
 #endif
-class endBtn {
+class endBtn
+{
 private:
   byte _pin, _truth;
   bool _state;
@@ -107,23 +112,29 @@ public:
   // ~endBtn();
 };
 
-endBtn::endBtn(byte pin, byte pin_mode, byte truth) {
+endBtn::endBtn(byte pin, byte pin_mode, byte truth)
+{
   pinMode(pin, pin_mode);
   _pin = pin;
   _truth = truth;
 }
-bool endBtn::state() {
-  if (_state) {
+bool endBtn::state()
+{
+  if (_state)
+  {
     _state = (digitalRead(_pin) == _truth);
-    if (_state) {
-      return _state;  // 1
+    if (_state)
+    {
+      return _state; // 1
     }
     _debounce = millis() + DEBOUNCE_END;
-    return _state;  // 0
+    return _state; // 0
   }
 
-  if (_debounce) {
-    if (millis() >= _debounce) {
+  if (_debounce)
+  {
+    if (millis() >= _debounce)
+    {
       _debounce = 0;
       _state = (digitalRead(_pin) == _truth);
     }
@@ -145,7 +156,8 @@ auto speed = SPEED_A_MAX;
  * @return true - была смена скорости;
  * @return false - скорость не меняли
  */
-bool check_regulator() {
+bool check_regulator()
+{
 #if REGULATOR_INVERT
   uint16_t regulator_new = 1023 - analogRead(PIN_REGULATOR);
 #else
@@ -154,7 +166,8 @@ bool check_regulator() {
   int32_t reg = regulator_new - regulator;
   if (reg < 0)
     reg = -reg;
-  if (reg > DEBOUNCE_REGULATOR) {
+  if (reg > DEBOUNCE_REGULATOR)
+  {
     regulator = regulator_new;
     speed = map(regulator, 0, 1023, SPEED_A_MIN, SPEED_A_MAX);
     DDD("SPEED: ");
@@ -164,15 +177,38 @@ bool check_regulator() {
   return 0;
 }
 
-void error() {
+void error()
+{
 #if PROTECT
-  while (1) {
+  while (1)
+  {
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     delay(200);
   }
 #endif
 }
-void setup() {
+void retract()
+{
+  if (stepper.getCurrent() > (RETRACT / RETRACT_DIV))
+  {
+    stepper.setCurrent(RETRACT);
+    stepper.setMaxSpeed(RETRACT_SPEED);
+    stepper.setTarget(0);
+    while (stepper.getStatus())
+    {
+      stepper.tick();
+      if (endB.state()) // если концевик B зажат
+      {
+        DD("Конец B");
+        f_onB = true;
+        stepper.brake();
+        stepper.tick();
+      }
+    }
+  }
+}
+void setup()
+{
   stepper.reverse(INVERT_DIR);
   stepper.disable();
   stepper.tick();
@@ -188,9 +224,8 @@ void setup() {
   f_onB = endB.state();
   speed = SPEED_A_MIN;
   pinMode(OUTPUT, LED_BUILTIN);
-
 #ifdef DEBUG
-  Serial.begin(9600);
+  Serial.begin(115200);
 #endif
   DD("START");
 }
@@ -199,61 +234,68 @@ unsigned long timework = 0, time_auto_to_b = 0;
 #ifdef DEBUG
 unsigned long timer1 = 0;
 #endif
-void loop() {
-  if (btnA.state())  // Движение по кнопке А
+void loop()
+{
+  if (btnA.state()) // Движение по кнопке А
   {
     f_onA = endA.state();
     f_onB = endB.state();
     DD("Кнопка A нажата");
     // f_manual = true;
-    check_regulator();  // получаем скорость с крутилки
+    check_regulator(); // получаем скорость с крутилки
+    if (stepper.getCurrent() > RETRACT)
+      stepper.setCurrent(0);
     stepper.enable();
     f_work = 1;
-    stepper.setSpeed(-speed);  // пишем скорость в двигло
+    stepper.setSpeed(speed); // пишем скорость в двигло
     DD("Старт! К А");
-    while (btnA.state())  // Пока кнопка зажата
+    while (btnA.state()) // Пока кнопка зажата
     {
-      if (endA.state())  // если концевик A зажат
+      if (endA.state()) // если концевик A зажат
       {
         DD("Конец А");
         f_onA = true;
         stepper.brake();
         stepper.tick();
-        stepper.setCurrent(0);
-      } else  // тут нам разрешено ехать
+      }
+      else // тут нам разрешено ехать
       {
-        if (endB.state() && !f_onB)  // если сработал не тот концевик
+        if (endB.state() && !f_onB) // если сработал не тот концевик
         {
           DD("Неправильный конец B");
           f_onB = true;
           stepper.brake();
           stepper.disable();
           stepper.tick();
-          error();  // Уходим в защиту и мигаем
+          error(); // Уходим в защиту и мигаем
         }
 
-        if (f_onB && !endB.state()) {
+        if (f_onB && !endB.state())
+        {
           DD("Отъехали от B");
-          f_onB = false;  // если мы отпустили концевик B
+          f_onB = false; // если мы отпустили концевик B
         }
 
         // едем едем в соседнее село...
         stepper.tick();
-        if (check_regulator()) {
-          stepper.setSpeed(-speed);
+        if (check_regulator())
+        {
+          stepper.setSpeed(speed);
         }
 #ifdef DEBUG
-        if (millis() - timer1 > 500) {
+        if (millis() - timer1 > 500)
+        {
           timer1 = millis();
           DD(stepper.getCurrent());
         }
 #endif
       }
     }
+    retract();
     timework = millis() + ADDWORK_TIME;
   }
 
-  if (btnB.state())  // Движение по кнопке B
+  if (btnB.state()) // Движение по кнопке B
   {
     f_onA = endA.state();
     f_onB = endB.state();
@@ -262,31 +304,33 @@ void loop() {
     // check_regulator(); // получаем скорость с крутилки
     stepper.enable();
     f_work = 1;
-    stepper.setSpeed(SPEED_B);  // пишем скорость в двигло
+    stepper.setSpeed(-SPEED_B); // пишем скорость в двигло
     DD("Старт! к B");
-    while (btnB.state())  // Пока кнопка зажата
+    while (btnB.state()) // Пока кнопка зажата
     {
-      if (endB.state())  // если концевик B зажат
+      if (endB.state()) // если концевик B зажат
       {
         DD("Конец B");
         f_onB = true;
         stepper.brake();
         stepper.tick();
-      } else  // тут нам разрешено ехать
+      }
+      else // тут нам разрешено ехать
       {
-        if (endA.state() && !f_onA)  // если сработал не тот концевик
+        if (endA.state() && !f_onA) // если сработал не тот концевик
         {
           DD("Неправильный конец A");
           f_onA = true;
           stepper.brake();
           stepper.disable();
           stepper.tick();
-          error();  // Уходим в защиту и мигаем
+          error(); // Уходим в защиту и мигаем
         }
 
-        if (f_onA && !endA.state()) {
+        if (f_onA && !endA.state())
+        {
           DD("Отъехали от A");
-          f_onA = false;  // если мы отпустили концевик A
+          f_onA = false; // если мы отпустили концевик A
         }
 
         // едем едем в соседнее село...
@@ -296,7 +340,8 @@ void loop() {
         //   stepper.setSpeed(speed);
         // }
 #ifdef DEBUG
-        if (millis() - timer1 > 500) {
+        if (millis() - timer1 > 500)
+        {
           timer1 = millis();
           DD(stepper.getCurrent());
         }
@@ -306,14 +351,15 @@ void loop() {
     timework = millis() + ADDWORK_TIME;
   }
 
-  if ((millis() > timework) && f_work) {
+  if ((millis() > timework) && f_work)
+  {
     DD("DISABLE!");
     stepper.disable();
     f_work = 0;
   }
 
   // TIMER_AUTO_TO_B
-  if (endA.state())  // Движение от А к B
+  if (endA.state()) // Движение от А к B
   {
     f_onA = endA.state();
     f_onB = endB.state();
@@ -322,40 +368,44 @@ void loop() {
     stepper.tick();
     delay(TIMER_AUTO_TO_B);
     f_work = 1;
-    stepper.setSpeed(SPEED_B);  // пишем скорость в двигло
+    stepper.setSpeed(-SPEED_B); // пишем скорость в двигло
     DD("Старт! A -> к Б");
-    while (!endB.state())  // Пока не встретим B
+    while (!endB.state()) // Пока не встретим B
     {
       // тут нам разрешено ехать
-      if (endA.state() && !f_onA)  // если сработал не тот концевик
+      if (endA.state() && !f_onA) // если сработал не тот концевик
       {
         DD("Неправильный конец A");
         f_onA = true;
         stepper.brake();
         stepper.disable();
         stepper.tick();
-        error();  // Уходим в защиту и мигаем
+        error(); // Уходим в защиту и мигаем
       }
 
-      if (f_onA && !endA.state()) {
+      if (f_onA && !endA.state())
+      {
         DD("Отъехали от A");
-        f_onA = false;  // если мы отпустили концевик A
+        f_onA = false; // если мы отпустили концевик A
       }
 
-      if (btnA.state() || btnB.state()) {
+      if (btnA.state() || btnB.state())
+      {
         break;
       }
       // едем едем в соседнее село...
       stepper.tick();
 
 #ifdef DEBUG
-      if (millis() - timer1 > 500) {
+      if (millis() - timer1 > 500)
+      {
         timer1 = millis();
         DD(stepper.getCurrent());
       }
 #endif
     }
-    if (endB.state()) {
+    if (endB.state())
+    {
       DD("END_B AUTO");
       f_onB = 1;
       stepper.brake();
