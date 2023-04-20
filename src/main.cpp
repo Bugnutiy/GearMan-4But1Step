@@ -253,7 +253,7 @@ void loop()
     {
       if (endA.state()) // если концевик A зажат
       {
-        DD("Конец А");
+        DD("Конец А сработал");
         f_onA = true;
         stepper.brake();
         stepper.tick();
@@ -310,7 +310,7 @@ void loop()
     {
       if (endB.state()) // если концевик B зажат
       {
-        DD("Конец B");
+        DD("Конец B сработал");
         f_onB = true;
         stepper.brake();
         stepper.tick();
@@ -353,7 +353,7 @@ void loop()
 
   if ((millis() > timework) && f_work)
   {
-    DD("DISABLE!");
+    DD("Двишатель отключен!");
     stepper.disable();
     f_work = 0;
   }
@@ -363,7 +363,8 @@ void loop()
   {
     f_onA = endA.state();
     f_onB = endB.state();
-    DD("A -> B START");
+    DD("A -> B Автостарт");
+    stepper.setSpeed(SPEED_B); // пишем скорость в двигло
     stepper.enable();
     stepper.tick();
     delay(TIMER_AUTO_TO_B);
